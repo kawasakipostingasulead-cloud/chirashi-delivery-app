@@ -635,12 +635,76 @@
         /*
          * この非表示iframeから来たメッセージだけ処理
          */
-        if (
-          event.source !==
-          responseFrame.contentWindow
-        ) {
-          return;
+      window.addEventListener(
+  'message',
+  function (event) {
+    /*
+     * Apps Scriptから送られた結果だけを処理
+     */
+    const result = event.data;
+
+    if (
+      !result ||
+      result.source !==
+        'chirashi-delivery-app'
+    ) {
+      return;
+    }
+
+    window.clearTimeout(responseTimer);
+    setSending(false);
+
+    if (!result.success) {
+      showError(
+        result.message ||
+        '配達依頼の送信に失敗しました。'
+      );
+
+      return;
+    }
+
+    const date = new Date(
+      lastRequest.deliveryDate +
+      'T00:00:00'
+    );
+
+    const formattedDate =
+      date.toLocaleDateString(
+        'ja-JP',
+        {
+          year: 'numeric',
+          month: 'long',
+          day: 'numeric',
+          weekday: 'short'
         }
+      );
+
+    document.getElementById(
+      'successDetail'
+    ).textContent =
+      formattedDate +
+      ' ／ ' +
+      lastRequest.timeSlot +
+      ' ／ ' +
+      Number(lastRequest.copies)
+        .toLocaleString() +
+      '枚';
+
+    document.getElementById(
+      'requestId'
+    ).textContent =
+      '受付番号：' +
+      result.requestId;
+
+    formView.hidden = true;
+    successView.hidden = false;
+
+    window.scrollTo({
+      top: 0,
+      behavior: 'smooth'
+    });
+  }
+);
 
         const result = event.data;
 
