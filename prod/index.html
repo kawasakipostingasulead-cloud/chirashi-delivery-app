@@ -1,1 +1,805 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
 
+  <meta
+    name="viewport"
+    content="width=device-width, initial-scale=1.0, viewport-fit=cover"
+  >
+
+  <title>チラシ配達依頼</title>
+
+  <script
+    charset="utf-8"
+    src="https://static.line-scdn.net/liff/edge/2/sdk.js"
+  ></script>
+
+  <style>
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      background: #f4f5f7;
+      color: #222;
+      font-family:
+        -apple-system,
+        BlinkMacSystemFont,
+        "Segoe UI",
+        "Noto Sans JP",
+        sans-serif;
+    }
+
+    button,
+    input,
+    select,
+    textarea {
+      font: inherit;
+    }
+
+    .container {
+      width: 100%;
+      max-width: 540px;
+      margin: 0 auto;
+      padding:
+        max(20px, env(safe-area-inset-top))
+        16px
+        max(40px, env(safe-area-inset-bottom));
+    }
+
+    .header {
+      margin-bottom: 20px;
+    }
+
+    .title {
+      margin: 0 0 6px;
+      font-size: 25px;
+      font-weight: 700;
+    }
+
+    .description {
+      margin: 0;
+      color: #666;
+      font-size: 14px;
+      line-height: 1.7;
+    }
+
+    .card {
+      padding: 20px;
+      background: #fff;
+      border-radius: 16px;
+      box-shadow: 0 2px 12px rgba(0, 0, 0, 0.06);
+    }
+
+    .user-box {
+      margin-bottom: 20px;
+      padding: 13px 14px;
+      background: #f0faf4;
+      border-radius: 10px;
+      font-size: 14px;
+    }
+
+    .field {
+      margin-top: 18px;
+    }
+
+    .field:first-of-type {
+      margin-top: 0;
+    }
+
+    label {
+      display: block;
+      margin-bottom: 7px;
+      font-size: 14px;
+      font-weight: 700;
+    }
+
+    .required {
+      margin-left: 5px;
+      color: #d93025;
+      font-size: 12px;
+    }
+
+    input,
+    select,
+    textarea {
+      width: 100%;
+      min-height: 50px;
+      padding: 11px 12px;
+      border: 1px solid #d0d4d9;
+      border-radius: 10px;
+      background: #fff;
+      color: #222;
+      font-size: 16px;
+    }
+
+    input:focus,
+    select:focus,
+    textarea:focus {
+      border-color: #06c755;
+      outline: 2px solid rgba(6, 199, 85, 0.14);
+    }
+
+    textarea {
+      min-height: 100px;
+      resize: vertical;
+    }
+
+    .note {
+      margin: 6px 0 0;
+      color: #777;
+      font-size: 12px;
+    }
+
+    .primary-button {
+      width: 100%;
+      min-height: 54px;
+      margin-top: 24px;
+      border: 0;
+      border-radius: 11px;
+      background: #06c755;
+      color: #fff;
+      font-size: 17px;
+      font-weight: 700;
+      cursor: pointer;
+    }
+
+    .primary-button:disabled {
+      background: #9ca3a7;
+      cursor: default;
+    }
+
+    .secondary-button {
+      width: 100%;
+      min-height: 50px;
+      margin-top: 12px;
+      border: 1px solid #cfd4d8;
+      border-radius: 11px;
+      background: #fff;
+      color: #333;
+      font-size: 16px;
+      font-weight: 600;
+      cursor: pointer;
+    }
+
+    .error {
+      margin-bottom: 16px;
+      padding: 12px 14px;
+      border-radius: 9px;
+      background: #fff0f0;
+      color: #b3261e;
+      font-size: 14px;
+      line-height: 1.6;
+    }
+
+    .loading {
+      padding: 70px 20px;
+      text-align: center;
+      color: #666;
+      line-height: 1.8;
+    }
+
+    .success {
+      padding: 10px 0;
+      text-align: center;
+    }
+
+    .success-mark {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 64px;
+      height: 64px;
+      margin: 0 auto 18px;
+      border-radius: 50%;
+      background: #06c755;
+      color: #fff;
+      font-size: 34px;
+      font-weight: 700;
+    }
+
+    .success h2 {
+      margin: 0 0 14px;
+      font-size: 22px;
+    }
+
+    .success-detail {
+      margin: 18px 0;
+      padding: 16px;
+      border-radius: 10px;
+      background: #f5f7f8;
+      line-height: 1.8;
+    }
+
+    .request-id {
+      margin-top: 14px;
+      color: #777;
+      font-size: 12px;
+    }
+
+    [hidden] {
+      display: none !important;
+    }
+  </style>
+</head>
+
+<body>
+
+  <main class="container">
+
+    <section id="loadingView" class="loading">
+      LINEと接続しています…
+    </section>
+
+
+    <section id="formView" hidden>
+
+      <header class="header">
+        <h1 class="title">チラシ配達依頼</h1>
+
+        <p class="description">
+          配達を希望する日付・時間帯・枚数を入力してください。
+          職員が確認後、LINEで配達可否をお知らせします。
+        </p>
+      </header>
+
+
+      <div class="card">
+
+        <div class="user-box">
+          利用者：
+          <strong id="displayName">確認中</strong>
+        </div>
+
+
+        <div
+          id="errorMessage"
+          class="error"
+          role="alert"
+          hidden
+        ></div>
+
+
+        <form
+          id="requestForm"
+          method="post"
+          target="gasResponseFrame"
+          novalidate
+        >
+
+          <input
+            type="hidden"
+            id="idToken"
+            name="idToken"
+          >
+
+
+          <div class="field">
+            <label for="deliveryDate">
+              配達希望日
+              <span class="required">必須</span>
+            </label>
+
+            <input
+              type="date"
+              id="deliveryDate"
+              name="deliveryDate"
+              required
+            >
+          </div>
+
+
+          <div class="field">
+            <label for="timeSlot">
+              希望時間帯
+              <span class="required">必須</span>
+            </label>
+
+            <select
+              id="timeSlot"
+              name="timeSlot"
+              required
+            >
+              <option value="">選択してください</option>
+              <option value="午前">午前</option>
+              <option value="13:00～15:00">
+                13:00～15:00
+              </option>
+              <option value="15:00～17:00">
+                15:00～17:00
+              </option>
+            </select>
+          </div>
+
+
+          <div class="field">
+            <label for="copies">
+              配達希望枚数
+              <span class="required">必須</span>
+            </label>
+
+            <select
+              id="copies"
+              name="copies"
+              required
+            >
+              <option value="">選択してください</option>
+              <option value="500">500枚</option>
+              <option value="1000">1,000枚</option>
+              <option value="1500">1,500枚</option>
+              <option value="2000">2,000枚</option>
+              <option value="2500">2,500枚</option>
+              <option value="3000">3,000枚</option>
+            </select>
+          </div>
+
+
+          <div class="field">
+            <label for="note">
+              備考
+            </label>
+
+            <textarea
+              id="note"
+              name="note"
+              maxlength="500"
+              placeholder="配達時の連絡事項などがあれば入力してください"
+            ></textarea>
+
+            <p class="note">
+              500文字以内
+            </p>
+          </div>
+
+
+          <button
+            type="submit"
+            id="submitButton"
+            class="primary-button"
+          >
+            配達を依頼する
+          </button>
+
+        </form>
+
+      </div>
+
+    </section>
+
+
+    <section id="successView" hidden>
+
+      <div class="card success">
+
+        <div class="success-mark">✓</div>
+
+        <h2>配達依頼を受け付けました</h2>
+
+        <p>
+          職員が内容を確認後、LINEでお知らせします。
+        </p>
+
+        <div
+          id="successDetail"
+          class="success-detail"
+        ></div>
+
+        <div
+          id="requestId"
+          class="request-id"
+        ></div>
+
+        <button
+          type="button"
+          class="secondary-button"
+          onclick="requestAgain()"
+        >
+          続けて依頼する
+        </button>
+
+        <button
+          type="button"
+          class="primary-button"
+          onclick="closeApp()"
+        >
+          閉じる
+        </button>
+
+      </div>
+
+    </section>
+
+  </main>
+
+
+  <iframe
+    id="gasResponseFrame"
+    name="gasResponseFrame"
+    title="送信結果"
+    hidden
+  ></iframe>
+
+
+<script>
+  /*
+   * LINE Developersの公開用LIFF ID
+   */
+  const LIFF_ID = '2010872621-pg8RZu11';
+
+    /*
+     * GASの /exec で終わるWebアプリURL
+     */
+    const GAS_WEB_APP_URL =
+      'https://script.google.com/macros/s/AKfycbwpyjQjcz-RPI-65jIxKNkiz1Gdp-Q5PwdrSx5RuH1x7F2W4gRPcprv8yHd6GElp9Ikeg/exec';
+
+
+    const loadingView =
+      document.getElementById('loadingView');
+
+    const formView =
+      document.getElementById('formView');
+
+    const successView =
+      document.getElementById('successView');
+
+    const form =
+      document.getElementById('requestForm');
+
+    const submitButton =
+      document.getElementById('submitButton');
+
+    const errorMessage =
+      document.getElementById('errorMessage');
+
+    const responseFrame =
+      document.getElementById('gasResponseFrame');
+
+
+    let responseTimer = null;
+    let lastRequest = null;
+
+
+    function formatLocalDate(date) {
+      const year = date.getFullYear();
+
+      const month =
+        String(date.getMonth() + 1)
+          .padStart(2, '0');
+
+      const day =
+        String(date.getDate())
+          .padStart(2, '0');
+
+      return `${year}-${month}-${day}`;
+    }
+
+
+    function setupDateInput() {
+      const today = new Date();
+
+      const tomorrow = new Date(today);
+      tomorrow.setDate(today.getDate() + 1);
+
+      const maximumDate = new Date(today);
+      maximumDate.setDate(today.getDate() + 30);
+
+      const input =
+        document.getElementById('deliveryDate');
+
+      input.min = formatLocalDate(today);
+      input.max = formatLocalDate(maximumDate);
+      input.value = formatLocalDate(tomorrow);
+    }
+
+
+    function showError(message) {
+      errorMessage.textContent = message;
+      errorMessage.hidden = false;
+    }
+
+
+    function hideError() {
+      errorMessage.textContent = '';
+      errorMessage.hidden = true;
+    }
+
+
+    function setSending(isSending) {
+      submitButton.disabled = isSending;
+
+      submitButton.textContent =
+        isSending
+          ? '送信しています…'
+          : '配達を依頼する';
+    }
+
+
+    async function initializeApp() {
+      try {
+        await liff.init({
+          liffId: LIFF_ID
+        });
+
+        if (!liff.isLoggedIn()) {
+          liff.login({
+            redirectUri: window.location.href
+          });
+
+          return;
+        }
+
+        const idToken = liff.getIDToken();
+
+        if (!idToken) {
+          throw new Error(
+            'LINE認証情報を取得できませんでした。'
+          );
+        }
+
+        const profile = await liff.getProfile();
+
+        document.getElementById(
+          'displayName'
+        ).textContent = profile.displayName;
+
+        document.getElementById(
+          'idToken'
+        ).value = idToken;
+
+        form.action = GAS_WEB_APP_URL;
+
+        setupDateInput();
+
+        loadingView.hidden = true;
+        formView.hidden = false;
+
+      } catch (error) {
+        console.error(error);
+
+        loadingView.innerHTML =
+          'LINEとの接続に失敗しました。<br>' +
+          'LINEアプリから開き直してください。<br><br>' +
+          String(error.message || error);
+      }
+    }
+
+
+    form.addEventListener(
+      'submit',
+      function (event) {
+        event.preventDefault();
+        hideError();
+
+        if (!form.reportValidity()) {
+          return;
+        }
+
+        const currentIdToken =
+          liff.getIDToken();
+
+        if (!currentIdToken) {
+          showError(
+            'LINE認証情報を取得できませんでした。' +
+            '画面を開き直してください。'
+          );
+
+          return;
+        }
+
+        document.getElementById(
+          'idToken'
+        ).value = currentIdToken;
+
+        lastRequest = {
+          deliveryDate:
+            document.getElementById(
+              'deliveryDate'
+            ).value,
+
+          timeSlot:
+            document.getElementById(
+              'timeSlot'
+            ).value,
+
+          copies:
+            document.getElementById(
+              'copies'
+            ).value
+        };
+
+        setSending(true);
+
+        form.submit();
+
+        responseTimer = window.setTimeout(
+          function () {
+            setSending(false);
+
+            showError(
+              '送信結果を確認できませんでした。' +
+              '通信状態を確認して、もう一度お試しください。'
+            );
+          },
+          20000
+        );
+      }
+    );
+
+
+    window.addEventListener(
+      'message',
+      function (event) {
+        /*
+         * この非表示iframeから来たメッセージだけ処理
+         */
+      window.addEventListener(
+  'message',
+  function (event) {
+    /*
+     * Apps Scriptから送られた結果だけを処理
+     */
+    const result = event.data;
+
+    if (
+      !result ||
+      result.source !==
+        'chirashi-delivery-app'
+    ) {
+      return;
+    }
+
+    window.clearTimeout(responseTimer);
+    setSending(false);
+
+    if (!result.success) {
+      showError(
+        result.message ||
+        '配達依頼の送信に失敗しました。'
+      );
+
+      return;
+    }
+
+    const date = new Date(
+      lastRequest.deliveryDate +
+      'T00:00:00'
+    );
+
+    const formattedDate =
+      date.toLocaleDateString(
+        'ja-JP',
+        {
+          year: 'numeric',
+          month: 'long',
+          day: 'numeric',
+          weekday: 'short'
+        }
+      );
+
+    document.getElementById(
+      'successDetail'
+    ).textContent =
+      formattedDate +
+      ' ／ ' +
+      lastRequest.timeSlot +
+      ' ／ ' +
+      Number(lastRequest.copies)
+        .toLocaleString() +
+      '枚';
+
+    document.getElementById(
+      'requestId'
+    ).textContent =
+      '受付番号：' +
+      result.requestId;
+
+    formView.hidden = true;
+    successView.hidden = false;
+
+    window.scrollTo({
+      top: 0,
+      behavior: 'smooth'
+    });
+  }
+);
+
+        const result = event.data;
+
+        if (
+          !result ||
+          result.source !==
+            'chirashi-delivery-app'
+        ) {
+          return;
+        }
+
+        window.clearTimeout(responseTimer);
+        setSending(false);
+
+        if (!result.success) {
+          showError(
+            result.message ||
+            '配達依頼の送信に失敗しました。'
+          );
+
+          return;
+        }
+
+        const date = new Date(
+          lastRequest.deliveryDate +
+          'T00:00:00'
+        );
+
+        const formattedDate =
+          date.toLocaleDateString(
+            'ja-JP',
+            {
+              year: 'numeric',
+              month: 'long',
+              day: 'numeric',
+              weekday: 'short'
+            }
+          );
+
+        document.getElementById(
+          'successDetail'
+        ).textContent =
+          formattedDate +
+          ' ／ ' +
+          lastRequest.timeSlot +
+          ' ／ ' +
+          Number(lastRequest.copies)
+            .toLocaleString() +
+          '枚';
+
+        document.getElementById(
+          'requestId'
+        ).textContent =
+          '受付番号：' +
+          result.requestId;
+
+        formView.hidden = true;
+        successView.hidden = false;
+
+        window.scrollTo({
+          top: 0,
+          behavior: 'smooth'
+        });
+      }
+    );
+
+
+    function requestAgain() {
+      successView.hidden = true;
+      formView.hidden = false;
+
+      form.reset();
+      setupDateInput();
+      hideError();
+
+      window.scrollTo({
+        top: 0,
+        behavior: 'smooth'
+      });
+    }
+
+
+    function closeApp() {
+      if (
+        typeof liff !== 'undefined' &&
+        liff.isInClient()
+      ) {
+        liff.closeWindow();
+      } else {
+        window.close();
+      }
+    }
+
+
+    initializeApp();
+  </script>
+
+</body>
+</html>
