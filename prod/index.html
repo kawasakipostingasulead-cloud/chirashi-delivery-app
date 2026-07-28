@@ -81,6 +81,22 @@
       font-size: 14px;
     }
 
+    .method-badge {
+      display: inline-block;
+      margin-top: 8px;
+      padding: 5px 9px;
+      border-radius: 999px;
+      background: #dcfce7;
+      color: #166534;
+      font-size: 12px;
+      font-weight: 700;
+    }
+
+    .method-badge.pickup {
+      background: #fff7ed;
+      color: #9a3412;
+    }
+
     .field {
       margin-top: 18px;
     }
@@ -237,9 +253,11 @@
     <section id="formView" hidden>
 
       <header class="header">
-        <h1 class="title">チラシ配達依頼</h1>
+        <h1 id="appTitle" class="title">
+          チラシ配達依頼
+        </h1>
 
-        <p class="description">
+        <p id="appDescription" class="description">
           配達を希望する日付・時間帯・枚数を入力してください。
           職員が確認後、LINEで配達可否をお知らせします。
         </p>
@@ -251,6 +269,13 @@
         <div class="user-box">
           利用者：
           <strong id="displayName">確認中</strong>
+          <br>
+          <span
+            id="receiveMethodBadge"
+            class="method-badge"
+          >
+            職員による配達
+          </span>
         </div>
 
 
@@ -271,6 +296,12 @@
 
           <input
             type="hidden"
+            name="requestType"
+            value="request"
+          >
+
+          <input
+            type="hidden"
             id="idToken"
             name="idToken"
           >
@@ -278,7 +309,7 @@
 
           <div class="field">
             <label for="deliveryDate">
-              配達希望日
+              <span id="dateLabelText">配達希望日</span>
               <span class="required">必須</span>
             </label>
 
@@ -293,7 +324,7 @@
 
           <div class="field">
             <label for="timeSlot">
-              希望時間帯
+              <span id="timeLabelText">希望時間帯</span>
               <span class="required">必須</span>
             </label>
 
@@ -316,7 +347,7 @@
 
           <div class="field">
             <label for="copies">
-              配達希望枚数
+              希望枚数
               <span class="required">必須</span>
             </label>
 
@@ -345,7 +376,7 @@
               id="note"
               name="note"
               maxlength="500"
-              placeholder="配達時の連絡事項などがあれば入力してください"
+              placeholder="連絡事項などがあれば入力してください"
             ></textarea>
 
             <p class="note">
@@ -364,6 +395,26 @@
 
         </form>
 
+
+        <form
+          id="profileForm"
+          method="post"
+          target="gasResponseFrame"
+          hidden
+        >
+          <input
+            type="hidden"
+            name="requestType"
+            value="profile"
+          >
+
+          <input
+            type="hidden"
+            id="profileIdToken"
+            name="idToken"
+          >
+        </form>
+
       </div>
 
     </section>
@@ -375,9 +426,11 @@
 
         <div class="success-mark">✓</div>
 
-        <h2>配達依頼を受け付けました</h2>
+        <h2 id="successTitle">
+          配達依頼を受け付けました
+        </h2>
 
-        <p>
+        <p id="successMessage">
           職員が内容を確認後、LINEでお知らせします。
         </p>
 
@@ -396,7 +449,7 @@
           class="secondary-button"
           onclick="requestAgain()"
         >
-          続けて依頼する
+          続けて申し込む
         </button>
 
         <button
@@ -422,11 +475,12 @@
   ></iframe>
 
 
-<script>
-  /*
-   * LINE Developersの公開用LIFF ID
-   */
-  const LIFF_ID = '2010872621-pg8RZu11';
+  <script>
+    /*
+     * LINE Developersの公開用LIFF ID
+     */
+    const LIFF_ID =
+      '2010872621-pg8RZu11';
 
     /*
      * GASの /exec で終わるWebアプリURL
@@ -434,6 +488,9 @@
     const GAS_WEB_APP_URL =
       'https://script.google.com/macros/s/AKfycbwpyjQjcz-RPI-65jIxKNkiz1Gdp-Q5PwdrSx5RuH1x7F2W4gRPcprv8yHd6GElp9Ikeg/exec';
 
+
+    const RECEIVE_METHOD_DELIVERY = '配達';
+    const RECEIVE_METHOD_PICKUP = '来所受取';
 
     const loadingView =
       document.getElementById('loadingView');
@@ -447,18 +504,21 @@
     const form =
       document.getElementById('requestForm');
 
+    const profileForm =
+      document.getElementById('profileForm');
+
     const submitButton =
       document.getElementById('submitButton');
 
     const errorMessage =
       document.getElementById('errorMessage');
 
-    const responseFrame =
-      document.getElementById('gasResponseFrame');
-
 
     let responseTimer = null;
+    let profileTimer = null;
     let lastRequest = null;
+    let currentReceiveMethod =
+      RECEIVE_METHOD_DELIVERY;
 
 
     function formatLocalDate(date) {
@@ -509,10 +569,95 @@
     function setSending(isSending) {
       submitButton.disabled = isSending;
 
+      if (isSending) {
+        submitButton.textContent =
+          '送信しています…';
+
+        return;
+      }
+
       submitButton.textContent =
-        isSending
-          ? '送信しています…'
+        currentReceiveMethod ===
+          RECEIVE_METHOD_PICKUP
+          ? '受け取りを申し込む'
           : '配達を依頼する';
+    }
+
+
+    function applyReceiveMethod() {
+      const isPickup =
+        currentReceiveMethod ===
+        RECEIVE_METHOD_PICKUP;
+
+      document.title =
+        isPickup
+          ? 'チラシ受取申込'
+          : 'チラシ配達依頼';
+
+      document.getElementById(
+        'appTitle'
+      ).textContent =
+        isPickup
+          ? 'チラシ受取申込'
+          : 'チラシ配達依頼';
+
+      document.getElementById(
+        'appDescription'
+      ).textContent =
+        isPickup
+          ? '事業所で受け取る日付・時間帯・枚数を入力してください。職員が確認後、LINEでお知らせします。'
+          : '配達を希望する日付・時間帯・枚数を入力してください。職員が確認後、LINEで配達可否をお知らせします。';
+
+      document.getElementById(
+        'dateLabelText'
+      ).textContent =
+        isPickup
+          ? '受取希望日'
+          : '配達希望日';
+
+      document.getElementById(
+        'timeLabelText'
+      ).textContent =
+        isPickup
+          ? '受取希望時間帯'
+          : '希望時間帯';
+
+      const badge =
+        document.getElementById(
+          'receiveMethodBadge'
+        );
+
+      badge.textContent =
+        isPickup
+          ? '自分で事業所へ取りに行く'
+          : '職員による配達';
+
+      badge.className =
+        'method-badge' +
+        (isPickup ? ' pickup' : '');
+
+      document.getElementById(
+        'note'
+      ).placeholder =
+        isPickup
+          ? '受け取り時の連絡事項などがあれば入力してください'
+          : '配達時の連絡事項などがあれば入力してください';
+
+      document.getElementById(
+        'successTitle'
+      ).textContent =
+        isPickup
+          ? '受取申込を受け付けました'
+          : '配達依頼を受け付けました';
+
+      document.getElementById(
+        'successMessage'
+      ).textContent =
+        isPickup
+          ? '職員が内容を確認後、LINEで受取可否をお知らせします。'
+          : '職員が内容を確認後、LINEでお知らせします。';
+
+      setSending(false);
     }
 
 
@@ -542,18 +687,38 @@
 
         document.getElementById(
           'displayName'
-        ).textContent = profile.displayName;
+        ).textContent =
+          profile.displayName;
 
         document.getElementById(
           'idToken'
-        ).value = idToken;
+        ).value =
+          idToken;
 
-        form.action = GAS_WEB_APP_URL;
+        document.getElementById(
+          'profileIdToken'
+        ).value =
+          idToken;
+
+        form.action =
+          GAS_WEB_APP_URL;
+
+        profileForm.action =
+          GAS_WEB_APP_URL;
 
         setupDateInput();
 
-        loadingView.hidden = true;
-        formView.hidden = false;
+        profileForm.submit();
+
+        profileTimer =
+          window.setTimeout(
+            function () {
+              loadingView.innerHTML =
+                '利用者設定を確認できませんでした。<br>' +
+                '通信状態を確認して、LINEから開き直してください。';
+            },
+            20000
+          );
 
       } catch (error) {
         console.error(error);
@@ -590,7 +755,8 @@
 
         document.getElementById(
           'idToken'
-        ).value = currentIdToken;
+        ).value =
+          currentIdToken;
 
         lastRequest = {
           deliveryDate:
@@ -613,17 +779,18 @@
 
         form.submit();
 
-        responseTimer = window.setTimeout(
-          function () {
-            setSending(false);
+        responseTimer =
+          window.setTimeout(
+            function () {
+              setSending(false);
 
-            showError(
-              '送信結果を確認できませんでした。' +
-              '通信状態を確認して、もう一度お試しください。'
-            );
-          },
-          20000
-        );
+              showError(
+                '送信結果を確認できませんでした。' +
+                '通信状態を確認して、もう一度お試しください。'
+              );
+            },
+            20000
+          );
       }
     );
 
@@ -631,80 +798,6 @@
     window.addEventListener(
       'message',
       function (event) {
-        /*
-         * この非表示iframeから来たメッセージだけ処理
-         */
-      window.addEventListener(
-  'message',
-  function (event) {
-    /*
-     * Apps Scriptから送られた結果だけを処理
-     */
-    const result = event.data;
-
-    if (
-      !result ||
-      result.source !==
-        'chirashi-delivery-app'
-    ) {
-      return;
-    }
-
-    window.clearTimeout(responseTimer);
-    setSending(false);
-
-    if (!result.success) {
-      showError(
-        result.message ||
-        '配達依頼の送信に失敗しました。'
-      );
-
-      return;
-    }
-
-    const date = new Date(
-      lastRequest.deliveryDate +
-      'T00:00:00'
-    );
-
-    const formattedDate =
-      date.toLocaleDateString(
-        'ja-JP',
-        {
-          year: 'numeric',
-          month: 'long',
-          day: 'numeric',
-          weekday: 'short'
-        }
-      );
-
-    document.getElementById(
-      'successDetail'
-    ).textContent =
-      formattedDate +
-      ' ／ ' +
-      lastRequest.timeSlot +
-      ' ／ ' +
-      Number(lastRequest.copies)
-        .toLocaleString() +
-      '枚';
-
-    document.getElementById(
-      'requestId'
-    ).textContent =
-      '受付番号：' +
-      result.requestId;
-
-    formView.hidden = true;
-    successView.hidden = false;
-
-    window.scrollTo({
-      top: 0,
-      behavior: 'smooth'
-    });
-  }
-);
-
         const result = event.data;
 
         if (
@@ -715,17 +808,69 @@
           return;
         }
 
-        window.clearTimeout(responseTimer);
+        if (result.mode === 'profile') {
+          window.clearTimeout(
+            profileTimer
+          );
+
+          if (!result.success) {
+            loadingView.innerHTML =
+              '利用者設定を確認できませんでした。<br><br>' +
+              String(
+                result.message ||
+                '職員へ確認してください。'
+              );
+
+            return;
+          }
+
+          currentReceiveMethod =
+            result.receiveMethod ===
+              RECEIVE_METHOD_PICKUP
+              ? RECEIVE_METHOD_PICKUP
+              : RECEIVE_METHOD_DELIVERY;
+
+          if (result.userName) {
+            document.getElementById(
+              'displayName'
+            ).textContent =
+              result.userName;
+          }
+
+          applyReceiveMethod();
+
+          loadingView.hidden = true;
+          formView.hidden = false;
+
+          return;
+        }
+
+        if (result.mode !== 'request') {
+          return;
+        }
+
+        window.clearTimeout(
+          responseTimer
+        );
+
         setSending(false);
 
         if (!result.success) {
           showError(
             result.message ||
-            '配達依頼の送信に失敗しました。'
+            '依頼の送信に失敗しました。'
           );
 
           return;
         }
+
+        currentReceiveMethod =
+          result.receiveMethod ===
+            RECEIVE_METHOD_PICKUP
+            ? RECEIVE_METHOD_PICKUP
+            : RECEIVE_METHOD_DELIVERY;
+
+        applyReceiveMethod();
 
         const date = new Date(
           lastRequest.deliveryDate +
@@ -776,8 +921,15 @@
       formView.hidden = false;
 
       form.reset();
+
+      document.getElementById(
+        'idToken'
+      ).value =
+        liff.getIDToken() || '';
+
       setupDateInput();
       hideError();
+      applyReceiveMethod();
 
       window.scrollTo({
         top: 0,
