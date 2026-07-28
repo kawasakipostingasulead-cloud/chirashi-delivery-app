@@ -105,6 +105,30 @@
       margin-top: 0;
     }
 
+    .schedule-field {
+      padding: 14px;
+      border: 2px solid #bbf7d0;
+      border-radius: 13px;
+      background: #f0fdf4;
+    }
+
+    .schedule-field + .schedule-field {
+      margin-top: 12px;
+    }
+
+    .schedule-field label {
+      margin-bottom: 9px;
+      font-size: 17px;
+    }
+
+    .schedule-field input,
+    .schedule-field select {
+      min-height: 62px;
+      border-width: 2px;
+      font-size: 20px;
+      font-weight: 700;
+    }
+
     label {
       display: block;
       margin-bottom: 7px;
@@ -223,10 +247,14 @@
 
     .success-detail {
       margin: 18px 0;
-      padding: 16px;
-      border-radius: 10px;
-      background: #f5f7f8;
-      line-height: 1.8;
+      padding: 18px;
+      border: 2px solid #bbf7d0;
+      border-radius: 12px;
+      background: #f0fdf4;
+      font-size: 20px;
+      font-weight: 800;
+      line-height: 1.7;
+      white-space: pre-line;
     }
 
     .request-id {
@@ -307,7 +335,7 @@
           >
 
 
-          <div class="field">
+          <div class="field schedule-field">
             <label for="deliveryDate">
               <span id="dateLabelText">配達希望日</span>
               <span class="required">必須</span>
@@ -322,7 +350,7 @@
           </div>
 
 
-          <div class="field">
+          <div class="field schedule-field">
             <label for="timeSlot">
               <span id="timeLabelText">希望時間帯</span>
               <span class="required">必須</span>
@@ -891,10 +919,13 @@
         document.getElementById(
           'successDetail'
         ).textContent =
+          (currentReceiveMethod === RECEIVE_METHOD_PICKUP
+            ? '受取日：'
+            : '配達日：') +
           formattedDate +
-          ' ／ ' +
+          '\n時間帯：' +
           lastRequest.timeSlot +
-          ' ／ ' +
+          '\n枚数：' +
           Number(lastRequest.copies)
             .toLocaleString() +
           '枚';
