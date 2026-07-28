@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta
+    name="viewport"
+    content="width=device-width, initial-scale=1.0"
+  >
+
+  <title>チラシ配達依頼APP</title>
+
+  <script
+    charset="utf-8"
+    src="https://static.line-scdn.net/liff/edge/2/sdk.js"
+  ></script>
+
+  <style>
+    body {
+      margin: 0;
+      padding: 30px 20px;
+      font-family: sans-serif;
+      background: #f5f6f7;
+      color: #222;
+    }
+
+    .card {
+      max-width: 500px;
+      margin: 30px auto;
+      padding: 24px;
+      background: white;
+      border-radius: 14px;
+      box-shadow: 0 2px 10px rgba(0, 0, 0, 0.08);
+    }
+
+    h1 {
+      font-size: 22px;
+      margin-top: 0;
+    }
+
+    #status {
+      line-height: 1.8;
+      white-space: pre-wrap;
+    }
+  </style>
+</head>
+
+<body>
+
+  <div class="card">
+    <h1>LINE接続テスト</h1>
+    <div id="status">開始しています…</div>
+  </div>
+
+  <script>
+    const LIFF_ID = '2010872618-PCOro87t';
+
+    const status = document.getElementById('status');
+
+    function show(message) {
+      status.textContent += '\n' + message;
+    }
+
+    async function start() {
+      status.textContent = '① HTML読み込み成功';
+
+      try {
+        show('② LIFF初期化開始');
+
+        await liff.init({
+          liffId: LIFF_ID
+        });
+
+        show('③ LIFF初期化成功');
+        show('LINE内起動：' + liff.isInClient());
+        show('ログイン状態：' + liff.isLoggedIn());
+
+        if (!liff.isLoggedIn()) {
+          show('④ LINEログインへ移動します');
+          liff.login();
+          return;
+        }
+
+        const profile = await liff.getProfile();
+
+        show('④ LINEユーザー取得成功');
+        show('表示名：' + profile.displayName);
+
+      } catch (error) {
+        show('');
+        show('【エラー】');
+        show('コード：' + (error.code || 'なし'));
+        show('内容：' + error.message);
+      }
+    }
+
+    start();
+  </script>
+
+</body>
+</html>
