@@ -338,6 +338,24 @@
       background: white;
     }
 
+    .reschedule-open-button {
+      width: 100%;
+      margin-top: 12px;
+      padding: 12px 14px;
+      border: 0;
+      border-radius: 10px;
+      background: #f59e0b;
+      color: #ffffff;
+      font-size: 15px;
+      font-weight: 800;
+      cursor: pointer;
+    }
+
+    .reschedule-open-button:disabled {
+      opacity: 0.55;
+      cursor: not-allowed;
+    }
+
     .reschedule-submit-button {
       width: 100%;
       margin-top: 10px;
@@ -1195,12 +1213,36 @@
         meta.textContent = metaText;
         item.appendChild(meta);
 
-        if (request.canReschedule) {
+        const isRescheduleRequested =
+          String(request.status || '').trim() ===
+            '日時変更' ||
+          request.canReschedule === true;
+
+        if (isRescheduleRequested) {
+          const key =
+            getSafeRequestKey(
+              request.requestId
+            );
+
+          /*
+           * backendのcanRescheduleが古いレスポンスで欠けていても、
+           * raw statusが「日時変更」なら必ずボタンを出します。
+           */
+          const openRescheduleButton =
+            document.createElement('button');
+
+          openRescheduleButton.type = 'button';
+          openRescheduleButton.className =
+            'reschedule-open-button';
+          openRescheduleButton.textContent =
+            '日時を変更する';
+
           const rescheduleBox =
             document.createElement('div');
 
           rescheduleBox.className =
             'reschedule-box';
+          rescheduleBox.hidden = true;
 
           const boxTitle =
             document.createElement('div');
@@ -1209,7 +1251,7 @@
             'reschedule-box-title';
 
           boxTitle.textContent =
-            '職員から日時変更のお願いが届いています。新しい希望日時を送ってください。';
+            '新しい希望日時を選択して送信してください。';
 
           rescheduleBox.appendChild(boxTitle);
 
@@ -1218,11 +1260,6 @@
 
           grid.className =
             'reschedule-grid';
-
-          const key =
-            getSafeRequestKey(
-              request.requestId
-            );
 
           const bounds =
             getDateBounds();
@@ -1295,7 +1332,7 @@
           submitRescheduleButton.className =
             'primary-button reschedule-submit-button';
           submitRescheduleButton.textContent =
-            'この内容で日時を変更する';
+            'この内容で変更を送信する';
 
           submitRescheduleButton.addEventListener(
             'click',
@@ -1310,7 +1347,29 @@
             submitRescheduleButton
           );
 
-          item.appendChild(rescheduleBox);
+          openRescheduleButton.addEventListener(
+            'click',
+            function () {
+              const willOpen =
+                rescheduleBox.hidden;
+
+              rescheduleBox.hidden =
+                !willOpen;
+
+              openRescheduleButton.textContent =
+                willOpen
+                  ? '日時変更を閉じる'
+                  : '日時を変更する';
+            }
+          );
+
+          item.appendChild(
+            openRescheduleButton
+          );
+
+          item.appendChild(
+            rescheduleBox
+          );
         }
 
         if (request.canCancel) {
@@ -2105,6 +2164,17 @@
           showNotice(
             result.message ||
             '新しい希望日時を送信しました。職員の確認をお待ちください。'
+          );
+
+          /*
+           * 書き込み直後にプロフィールを再取得し、
+           * 依頼状況カードも新しい日時へ確実に更新します。
+           */
+          window.setTimeout(
+            function () {
+              refreshRequestStatus();
+            },
+            500
           );
 
           window.scrollTo({
