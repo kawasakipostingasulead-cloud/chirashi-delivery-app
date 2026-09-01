@@ -283,6 +283,21 @@
       font-weight: 800;
     }
 
+    .request-refresh-button {
+      width: 100%;
+      margin: 8px 0 12px;
+    }
+
+    .request-status-info {
+      margin: 8px 0 12px;
+      padding: 10px 12px;
+      border-radius: 9px;
+      background: #f8fafc;
+      color: #475569;
+      font-size: 13px;
+      line-height: 1.6;
+    }
+
     .past-requests-block {
       margin-top: 22px;
       padding-top: 12px;
@@ -462,7 +477,6 @@
         <section
           id="activeRequestsSection"
           class="active-section"
-          hidden
         >
           <h2>
             依頼状況
@@ -473,7 +487,22 @@
             過去の申込も含めてすべて表示します。
           </p>
 
-          <div id="currentRequestsBlock" hidden>
+          <button
+            type="button"
+            id="refreshRequestsButton"
+            class="secondary-button request-refresh-button"
+          >
+            依頼状況を更新
+          </button>
+
+          <div
+            id="requestStatusMessage"
+            class="request-status-info"
+          >
+            依頼状況を読み込んでいます…
+          </div>
+
+          <div id="currentRequestsBlock">
             <div class="request-group-heading">
               対応中の依頼
               <span id="currentRequestCount"></span>
@@ -487,7 +516,6 @@
           <div
             id="pastRequestsBlock"
             class="past-requests-block"
-            hidden
           >
             <div class="request-group-heading">
               過去の依頼
@@ -901,13 +929,13 @@
           'pastRequestCount'
         );
 
+      const statusMessage =
+        document.getElementById(
+          'requestStatusMessage'
+        );
+
       currentList.innerHTML = '';
       pastList.innerHTML = '';
-
-      if (!activeRequests.length) {
-        section.hidden = true;
-        return;
-      }
 
       const currentStatuses = [
         '確認待ち',
@@ -1006,18 +1034,16 @@
         item.appendChild(detail);
 
         if (request.statusMessage) {
-          const statusMessage =
+          const message =
             document.createElement('div');
 
-          statusMessage.className =
+          message.className =
             'request-status-message';
 
-          statusMessage.textContent =
+          message.textContent =
             request.statusMessage;
 
-          item.appendChild(
-            statusMessage
-          );
+          item.appendChild(message);
         }
 
         if (request.staffMemo) {
@@ -1122,24 +1148,61 @@
         pastRequests.length +
         '件）';
 
-      currentBlock.hidden =
-        currentRequests.length === 0;
-
-      pastBlock.hidden =
-        pastRequests.length === 0;
-
+      currentBlock.hidden = false;
+      pastBlock.hidden = false;
       section.hidden = false;
+
+      if (!activeRequests.length) {
+        statusMessage.hidden = false;
+        statusMessage.textContent =
+          '現在、このLINEアカウントに紐づく依頼はありません。';
+
+        currentList.innerHTML =
+          '<div class="request-status-info">対応中の依頼はありません。</div>';
+
+        pastList.innerHTML =
+          '<div class="request-status-info">過去の依頼はありません。</div>';
+
+        return;
+      }
+
+      statusMessage.hidden = true;
+
+      if (!currentRequests.length) {
+        currentList.innerHTML =
+          '<div class="request-status-info">対応中の依頼はありません。</div>';
+      }
+
+      if (!pastRequests.length) {
+        pastList.innerHTML =
+          '<div class="request-status-info">過去の依頼はありません。</div>';
+      }
     }
 
 
 
-    function setActiveRequests(requests) {
+    function setActiveRequests(
+      requests,
+      responseHasRequestsField = true
+    ) {
       activeRequests =
         Array.isArray(requests)
           ? requests
           : [];
 
       renderActiveRequests();
+
+      if (!responseHasRequestsField) {
+        const statusMessage =
+          document.getElementById(
+            'requestStatusMessage'
+          );
+
+        statusMessage.hidden = false;
+        statusMessage.textContent =
+          '依頼状況を取得できませんでした。' +
+          '配達依頼APP側のCode.gsが最新デプロイになっているか確認してください。';
+      }
     }
 
 
@@ -1333,6 +1396,55 @@
     }
 
 
+    function refreshRequestStatus() {
+      hideError();
+      hideNotice();
+
+      const currentIdToken =
+        liff.getIDToken();
+
+      if (!currentIdToken) {
+        showError(
+          'LINE認証情報を取得できませんでした。画面を開き直してください。'
+        );
+        return;
+      }
+
+      document.getElementById(
+        'profileIdToken'
+      ).value =
+        currentIdToken;
+
+      profileForm.action =
+        GAS_WEB_APP_URL;
+
+      const statusMessage =
+        document.getElementById(
+          'requestStatusMessage'
+        );
+
+      statusMessage.hidden = false;
+      statusMessage.textContent =
+        '依頼状況を更新しています…';
+
+      profileForm.submit();
+
+      window.clearTimeout(
+        profileTimer
+      );
+
+      profileTimer =
+        window.setTimeout(
+          function () {
+            statusMessage.hidden = false;
+            statusMessage.textContent =
+              '依頼状況を更新できませんでした。通信状態を確認してください。';
+          },
+          20000
+        );
+    }
+
+
     async function initializeApp() {
       try {
         await liff.init({
@@ -1520,7 +1632,11 @@
           applyReceiveMethod();
 
           setActiveRequests(
-            result.activeRequests
+            result.activeRequests,
+            Object.prototype.hasOwnProperty.call(
+              result,
+              'activeRequests'
+            )
           );
 
           loadingView.hidden = true;
@@ -1711,6 +1827,14 @@
         window.close();
       }
     }
+
+
+    document.getElementById(
+      'refreshRequestsButton'
+    ).addEventListener(
+      'click',
+      refreshRequestStatus
+    );
 
 
     initializeApp();
