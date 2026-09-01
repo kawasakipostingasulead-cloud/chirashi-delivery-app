@@ -298,6 +298,51 @@
       line-height: 1.6;
     }
 
+    .reschedule-box {
+      margin-top: 12px;
+      padding: 12px;
+      border-radius: 12px;
+      border: 1px solid #facc15;
+      background: #fffbeb;
+    }
+
+    .reschedule-box-title {
+      font-size: 13px;
+      font-weight: 800;
+      color: #92400e;
+      margin-bottom: 8px;
+    }
+
+    .reschedule-grid {
+      display: grid;
+      gap: 8px;
+      margin-top: 8px;
+    }
+
+    .reschedule-grid label {
+      display: grid;
+      gap: 4px;
+      font-size: 13px;
+      font-weight: 700;
+      color: #475569;
+    }
+
+    .reschedule-grid input,
+    .reschedule-grid select {
+      width: 100%;
+      padding: 10px 12px;
+      border: 1px solid #cbd5e1;
+      border-radius: 10px;
+      box-sizing: border-box;
+      font: inherit;
+      background: white;
+    }
+
+    .reschedule-submit-button {
+      width: 100%;
+      margin-top: 10px;
+    }
+
     .past-requests-block {
       margin-top: 22px;
       padding-top: 12px;
@@ -682,6 +727,43 @@
           >
         </form>
 
+        <form
+          id="rescheduleForm"
+          method="post"
+          target="gasResponseFrame"
+          hidden
+        >
+          <input
+            type="hidden"
+            name="requestType"
+            value="reschedule"
+          >
+
+          <input
+            type="hidden"
+            id="rescheduleIdToken"
+            name="idToken"
+          >
+
+          <input
+            type="hidden"
+            id="rescheduleRequestId"
+            name="requestId"
+          >
+
+          <input
+            type="hidden"
+            id="rescheduleDeliveryDate"
+            name="deliveryDate"
+          >
+
+          <input
+            type="hidden"
+            id="rescheduleTimeSlot"
+            name="timeSlot"
+          >
+        </form>
+
       </div>
 
     </section>
@@ -786,6 +868,9 @@
     const cancelForm =
       document.getElementById('cancelForm');
 
+    const rescheduleForm =
+      document.getElementById('rescheduleForm');
+
     const submitButton =
       document.getElementById('submitButton');
 
@@ -796,6 +881,7 @@
     let responseTimer = null;
     let profileTimer = null;
     let cancelTimer = null;
+    let rescheduleTimer = null;
     let lastRequest = null;
     let latestRequestId = '';
     let activeRequests = [];
@@ -817,6 +903,24 @@
       return `${year}-${month}-${day}`;
     }
 
+    function getDateBounds() {
+      const today = new Date();
+
+      const maximumDate = new Date(today);
+      maximumDate.setDate(today.getDate() + 30);
+
+      return {
+        min: formatLocalDate(today),
+        max: formatLocalDate(maximumDate)
+      };
+    }
+
+
+    function getSafeRequestKey(requestId) {
+      return String(requestId || '')
+        .replace(/[^a-zA-Z0-9_-]/g, '_');
+    }
+
 
     function setupDateInput() {
       const today = new Date();
@@ -824,14 +928,13 @@
       const tomorrow = new Date(today);
       tomorrow.setDate(today.getDate() + 1);
 
-      const maximumDate = new Date(today);
-      maximumDate.setDate(today.getDate() + 30);
+      const bounds = getDateBounds();
 
       const input =
         document.getElementById('deliveryDate');
 
-      input.min = formatLocalDate(today);
-      input.max = formatLocalDate(maximumDate);
+      input.min = bounds.min;
+      input.max = bounds.max;
       input.value = formatLocalDate(tomorrow);
     }
 
@@ -1091,6 +1194,124 @@
 
         meta.textContent = metaText;
         item.appendChild(meta);
+
+        if (request.canReschedule) {
+          const rescheduleBox =
+            document.createElement('div');
+
+          rescheduleBox.className =
+            'reschedule-box';
+
+          const boxTitle =
+            document.createElement('div');
+
+          boxTitle.className =
+            'reschedule-box-title';
+
+          boxTitle.textContent =
+            '職員から日時変更のお願いが届いています。新しい希望日時を送ってください。';
+
+          rescheduleBox.appendChild(boxTitle);
+
+          const grid =
+            document.createElement('div');
+
+          grid.className =
+            'reschedule-grid';
+
+          const key =
+            getSafeRequestKey(
+              request.requestId
+            );
+
+          const bounds =
+            getDateBounds();
+
+          const dateLabel =
+            document.createElement('label');
+
+          dateLabel.textContent =
+            isPickup
+              ? '新しい受取希望日'
+              : '新しい配達希望日';
+
+          const dateInput =
+            document.createElement('input');
+
+          dateInput.type = 'date';
+          dateInput.id =
+            'reschedule-date-' + key;
+          dateInput.value =
+            request.deliveryDate || '';
+          dateInput.min = bounds.min;
+          dateInput.max = bounds.max;
+
+          dateLabel.appendChild(dateInput);
+
+          const timeLabel =
+            document.createElement('label');
+
+          timeLabel.textContent =
+            isPickup
+              ? '新しい受取希望時間帯'
+              : '新しい希望時間帯';
+
+          const timeSelect =
+            document.createElement('select');
+
+          timeSelect.id =
+            'reschedule-time-' + key;
+
+          [
+            '',
+            '午前',
+            '13:00～15:00',
+            '15:00～17:00'
+          ].forEach(function (slot) {
+            const option =
+              document.createElement('option');
+
+            option.value = slot;
+            option.textContent =
+              slot || '選択してください';
+
+            if (slot === request.timeSlot) {
+              option.selected = true;
+            }
+
+            timeSelect.appendChild(option);
+          });
+
+          timeLabel.appendChild(timeSelect);
+
+          grid.appendChild(dateLabel);
+          grid.appendChild(timeLabel);
+          rescheduleBox.appendChild(grid);
+
+          const submitRescheduleButton =
+            document.createElement('button');
+
+          submitRescheduleButton.type = 'button';
+          submitRescheduleButton.className =
+            'primary-button reschedule-submit-button';
+          submitRescheduleButton.textContent =
+            'この内容で日時を変更する';
+
+          submitRescheduleButton.addEventListener(
+            'click',
+            function () {
+              submitRescheduleRequest(
+                request.requestId
+              );
+            }
+          );
+
+          rescheduleBox.appendChild(
+            submitRescheduleButton
+          );
+
+          item.appendChild(rescheduleBox);
+        }
 
         if (request.canCancel) {
           const cancelButton =
@@ -1445,6 +1666,159 @@
     }
 
 
+
+    function submitRescheduleRequest(requestId) {
+      if (!requestId) {
+        showError(
+          '日時変更する申込を取得できませんでした。'
+        );
+        return;
+      }
+
+      const key =
+        getSafeRequestKey(requestId);
+
+      const dateInput =
+        document.getElementById(
+          'reschedule-date-' + key
+        );
+
+      const timeSelect =
+        document.getElementById(
+          'reschedule-time-' + key
+        );
+
+      if (!dateInput || !timeSelect) {
+        showError(
+          '日時変更フォームを取得できませんでした。'
+        );
+        return;
+      }
+
+      const deliveryDate =
+        String(dateInput.value || '').trim();
+
+      const timeSlot =
+        String(timeSelect.value || '').trim();
+
+      if (!deliveryDate) {
+        showError(
+          '新しい希望日を選択してください。'
+        );
+        return;
+      }
+
+      if (!timeSlot) {
+        showError(
+          '新しい希望時間帯を選択してください。'
+        );
+        return;
+      }
+
+      const target =
+        activeRequests.find(
+          function (request) {
+            return (
+              request.requestId ===
+              requestId
+            );
+          }
+        );
+
+      let detailText = '';
+
+      if (target) {
+        detailText =
+          '\n\n変更前：' +
+          String(
+            target.deliveryDateText ||
+            target.deliveryDate ||
+            ''
+          ) +
+          ' ' +
+          String(target.timeSlot || '') +
+          '\n変更後：' +
+          deliveryDate +
+          ' ' +
+          timeSlot;
+      }
+
+      const confirmed =
+        window.confirm(
+          'この内容で日時を変更しますか？' +
+          detailText
+        );
+
+      if (!confirmed) {
+        return;
+      }
+
+      hideError();
+      hideNotice();
+
+      const currentIdToken =
+        liff.getIDToken();
+
+      if (!currentIdToken) {
+        showError(
+          'LINE認証情報を取得できませんでした。画面を開き直してください。'
+        );
+        return;
+      }
+
+      document.getElementById(
+        'rescheduleIdToken'
+      ).value =
+        currentIdToken;
+
+      document.getElementById(
+        'rescheduleRequestId'
+      ).value =
+        requestId;
+
+      document.getElementById(
+        'rescheduleDeliveryDate'
+      ).value =
+        deliveryDate;
+
+      document.getElementById(
+        'rescheduleTimeSlot'
+      ).value =
+        timeSlot;
+
+      rescheduleForm.action =
+        GAS_WEB_APP_URL;
+
+      document
+        .querySelectorAll(
+          '.reschedule-submit-button'
+        )
+        .forEach(function (button) {
+          button.disabled = true;
+        });
+
+      rescheduleForm.submit();
+
+      rescheduleTimer =
+        window.setTimeout(
+          function () {
+            document
+              .querySelectorAll(
+                '.reschedule-submit-button'
+              )
+              .forEach(function (button) {
+                button.disabled = false;
+              });
+
+            showError(
+              '日時変更結果を確認できませんでした。通信状態を確認して、もう一度お試しください。'
+            );
+          },
+          20000
+        );
+    }
+
+
     async function initializeApp() {
       try {
         await liff.init({
@@ -1493,8 +1867,16 @@
         cancelForm.action =
           GAS_WEB_APP_URL;
 
+        rescheduleForm.action =
+          GAS_WEB_APP_URL;
+
         document.getElementById(
           'cancelIdToken'
+        ).value =
+          idToken;
+
+        document.getElementById(
+          'rescheduleIdToken'
         ).value =
           idToken;
 
@@ -1681,6 +2063,48 @@
           showNotice(
             result.message ||
             '申込をキャンセルしました。'
+          );
+
+          window.scrollTo({
+            top: 0,
+            behavior: 'smooth'
+          });
+
+          return;
+        }
+
+        if (result.mode === 'reschedule') {
+          window.clearTimeout(
+            rescheduleTimer
+          );
+
+          document
+            .querySelectorAll(
+              '.reschedule-submit-button'
+            )
+            .forEach(function (button) {
+              button.disabled = false;
+            });
+
+          if (!result.success) {
+            showError(
+              result.message ||
+              '日時変更に失敗しました。'
+            );
+
+            return;
+          }
+
+          setActiveRequests(
+            result.activeRequests
+          );
+
+          successView.hidden = true;
+          formView.hidden = false;
+
+          showNotice(
+            result.message ||
+            '新しい希望日時を送信しました。職員の確認をお待ちください。'
           );
 
           window.scrollTo({
