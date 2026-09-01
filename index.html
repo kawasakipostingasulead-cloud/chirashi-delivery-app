@@ -277,6 +277,25 @@
       gap: 10px;
     }
 
+    .request-group-heading {
+      margin: 14px 0 8px;
+      font-size: 15px;
+      font-weight: 800;
+    }
+
+    .past-requests-block {
+      margin-top: 22px;
+      padding-top: 12px;
+      border-top: 2px solid #e5e7eb;
+    }
+
+    #requestCountText {
+      margin-left: 4px;
+      color: #64748b;
+      font-size: 13px;
+      font-weight: 700;
+    }
+
     .active-request-item {
       padding: 14px;
       border: 1px solid #d8dde2;
@@ -445,14 +464,40 @@
           class="active-section"
           hidden
         >
-          <h2>依頼状況</h2>
+          <h2>
+            依頼状況
+            <span id="requestCountText"></span>
+          </h2>
           <p class="active-section-description">
             申込日時・現在の状態・職員からの連絡を確認できます。
+            過去の申込も含めてすべて表示します。
           </p>
+
+          <div id="currentRequestsBlock" hidden>
+            <div class="request-group-heading">
+              対応中の依頼
+              <span id="currentRequestCount"></span>
+            </div>
+            <div
+              id="currentRequestsList"
+              class="active-request-list"
+            ></div>
+          </div>
+
           <div
-            id="activeRequestsList"
-            class="active-request-list"
-          ></div>
+            id="pastRequestsBlock"
+            class="past-requests-block"
+            hidden
+          >
+            <div class="request-group-heading">
+              過去の依頼
+              <span id="pastRequestCount"></span>
+            </div>
+            <div
+              id="pastRequestsList"
+              class="active-request-list"
+            ></div>
+          </div>
         </section>
 
 
@@ -821,171 +866,267 @@
           'activeRequestsSection'
         );
 
-      const list =
+      const currentBlock =
         document.getElementById(
-          'activeRequestsList'
+          'currentRequestsBlock'
         );
 
-      list.innerHTML = '';
+      const pastBlock =
+        document.getElementById(
+          'pastRequestsBlock'
+        );
+
+      const currentList =
+        document.getElementById(
+          'currentRequestsList'
+        );
+
+      const pastList =
+        document.getElementById(
+          'pastRequestsList'
+        );
+
+      const countText =
+        document.getElementById(
+          'requestCountText'
+        );
+
+      const currentCount =
+        document.getElementById(
+          'currentRequestCount'
+        );
+
+      const pastCount =
+        document.getElementById(
+          'pastRequestCount'
+        );
+
+      currentList.innerHTML = '';
+      pastList.innerHTML = '';
 
       if (!activeRequests.length) {
         section.hidden = true;
         return;
       }
 
-      activeRequests.forEach(
-        function (request) {
-          const item =
+      const currentStatuses = [
+        '確認待ち',
+        '配達確定',
+        '日時変更'
+      ];
+
+      const currentRequests =
+        activeRequests.filter(
+          function (request) {
+            return currentStatuses.includes(
+              String(request.status || '')
+            );
+          }
+        );
+
+      const pastRequests =
+        activeRequests.filter(
+          function (request) {
+            return !currentStatuses.includes(
+              String(request.status || '')
+            );
+          }
+        );
+
+      function createRequestItem(request) {
+        const item =
+          document.createElement('div');
+
+        item.className =
+          'active-request-item';
+
+        const title =
+          document.createElement('div');
+
+        title.className =
+          'active-request-title';
+
+        const isPickup =
+          request.receiveMethod ===
+          RECEIVE_METHOD_PICKUP;
+
+        title.textContent =
+          isPickup
+            ? '来所受取'
+            : '配達';
+
+        const status =
+          document.createElement('span');
+
+        status.className =
+          'status-badge';
+
+        status.textContent =
+          request.statusLabel ||
+          request.status ||
+          '職員確認待ち';
+
+        title.appendChild(status);
+
+        const detail =
+          document.createElement('div');
+
+        detail.className =
+          'active-request-detail';
+
+        detail.textContent =
+          '申込日時：' +
+          String(
+            request.requestedAtText ||
+            '不明'
+          ) +
+          '\n' +
+          (isPickup
+            ? '受取希望日：'
+            : '配達希望日：') +
+          String(
+            request.deliveryDateText ||
+            request.deliveryDate ||
+            ''
+          ) +
+          '\n時間帯：' +
+          String(request.timeSlot || '') +
+          '\n枚数：' +
+          Number(request.copies || 0)
+            .toLocaleString() +
+          '枚';
+
+        if (request.note) {
+          detail.textContent +=
+            '\n申込時の備考：' +
+            String(request.note);
+        }
+
+        item.appendChild(title);
+        item.appendChild(detail);
+
+        if (request.statusMessage) {
+          const statusMessage =
             document.createElement('div');
 
-          item.className =
-            'active-request-item';
+          statusMessage.className =
+            'request-status-message';
 
-          const title =
+          statusMessage.textContent =
+            request.statusMessage;
+
+          item.appendChild(
+            statusMessage
+          );
+        }
+
+        if (request.staffMemo) {
+          const memo =
             document.createElement('div');
 
-          title.className =
-            'active-request-title';
+          memo.className =
+            'staff-memo-box';
 
-          const isPickup =
-            request.receiveMethod ===
-            RECEIVE_METHOD_PICKUP;
-
-          title.textContent =
-            isPickup
-              ? '来所受取'
-              : '配達';
-
-          const status =
+          const memoTitle =
             document.createElement('span');
 
-          status.className =
-            'status-badge';
+          memoTitle.className =
+            'staff-memo-title';
 
-          status.textContent =
-            request.statusLabel ||
-            request.status ||
-            '職員確認待ち';
+          memoTitle.textContent =
+            '職員からのお知らせ';
 
-          title.appendChild(status);
-
-          const detail =
+          const memoText =
             document.createElement('div');
 
-          detail.className =
-            'active-request-detail';
+          memoText.textContent =
+            request.staffMemo;
 
-          detail.textContent =
-            '申込日時：' +
-            String(
-              request.requestedAtText ||
-              '不明'
-            ) +
-            '\n' +
-            (isPickup
-              ? '受取希望日：'
-              : '配達希望日：') +
-            String(
-              request.deliveryDateText ||
-              request.deliveryDate ||
-              ''
-            ) +
-            '\n時間帯：' +
-            String(request.timeSlot || '') +
-            '\n枚数：' +
-            Number(request.copies || 0)
-              .toLocaleString() +
-            '枚';
+          memo.appendChild(memoTitle);
+          memo.appendChild(memoText);
+          item.appendChild(memo);
+        }
 
-          item.appendChild(title);
-          item.appendChild(detail);
+        const meta =
+          document.createElement('div');
 
-          if (request.statusMessage) {
-            const statusMessage =
-              document.createElement('div');
+        meta.className =
+          'request-meta';
 
-            statusMessage.className =
-              'request-status-message';
+        let metaText =
+          '受付番号：' +
+          String(request.requestId || '');
 
-            statusMessage.textContent =
-              request.statusMessage;
+        if (request.updatedAtText) {
+          metaText +=
+            '\n最終更新：' +
+            request.updatedAtText;
+        }
 
-            item.appendChild(
-              statusMessage
-            );
-          }
+        meta.textContent = metaText;
+        item.appendChild(meta);
 
-          if (request.staffMemo) {
-            const memo =
-              document.createElement('div');
+        if (request.canCancel) {
+          const cancelButton =
+            document.createElement('button');
 
-            memo.className =
-              'staff-memo-box';
+          cancelButton.type = 'button';
+          cancelButton.className =
+            'danger-button';
+          cancelButton.textContent =
+            'この申込をキャンセルする';
 
-            const memoTitle =
-              document.createElement('span');
+          cancelButton.addEventListener(
+            'click',
+            function () {
+              cancelRequest(
+                request.requestId
+              );
+            }
+          );
 
-            memoTitle.className =
-              'staff-memo-title';
+          item.appendChild(cancelButton);
+        }
 
-            memoTitle.textContent =
-              '職員からのお知らせ';
+        return item;
+      }
 
-            const memoText =
-              document.createElement('div');
-
-            memoText.textContent =
-              request.staffMemo;
-
-            memo.appendChild(memoTitle);
-            memo.appendChild(memoText);
-            item.appendChild(memo);
-          }
-
-          const meta =
-            document.createElement('div');
-
-          meta.className =
-            'request-meta';
-
-          let metaText =
-            '受付番号：' +
-            String(request.requestId || '');
-
-          if (request.updatedAtText) {
-            metaText +=
-              '\n最終更新：' +
-              request.updatedAtText;
-          }
-
-          meta.textContent = metaText;
-          item.appendChild(meta);
-
-          if (request.canCancel) {
-            const cancelButton =
-              document.createElement('button');
-
-            cancelButton.type = 'button';
-            cancelButton.className =
-              'danger-button';
-            cancelButton.textContent =
-              'この申込をキャンセルする';
-
-            cancelButton.addEventListener(
-              'click',
-              function () {
-                cancelRequest(
-                  request.requestId
-                );
-              }
-            );
-
-            item.appendChild(cancelButton);
-          }
-
-          list.appendChild(item);
+      currentRequests.forEach(
+        function (request) {
+          currentList.appendChild(
+            createRequestItem(request)
+          );
         }
       );
+
+      pastRequests.forEach(
+        function (request) {
+          pastList.appendChild(
+            createRequestItem(request)
+          );
+        }
+      );
+
+      countText.textContent =
+        '全' +
+        activeRequests.length +
+        '件';
+
+      currentCount.textContent =
+        '（' +
+        currentRequests.length +
+        '件）';
+
+      pastCount.textContent =
+        '（' +
+        pastRequests.length +
+        '件）';
+
+      currentBlock.hidden =
+        currentRequests.length === 0;
+
+      pastBlock.hidden =
+        pastRequests.length === 0;
 
       section.hidden = false;
     }
