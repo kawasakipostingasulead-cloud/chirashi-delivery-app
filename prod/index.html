@@ -1485,7 +1485,7 @@
 
       const normalizedDate =
         rawDate
-          .replace(///g, '-')
+          .replace(/\//g, '-')
           .replace(
             /^(\d{4})-(\d{1,2})-(\d{1,2}).*$/,
             function (_, y, m, d) {
