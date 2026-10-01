@@ -601,8 +601,8 @@
 
           <input
             type="hidden"
-            name="requestType"
-            value="request"
+            name="action"
+            value="create"
           >
 
           <input
@@ -709,8 +709,8 @@
         >
           <input
             type="hidden"
-            name="requestType"
-            value="profile"
+            name="action"
+            value="list"
           >
 
           <input
@@ -728,7 +728,7 @@
         >
           <input
             type="hidden"
-            name="requestType"
+            name="action"
             value="cancel"
           >
 
@@ -753,8 +753,8 @@
         >
           <input
             type="hidden"
-            name="requestType"
-            value="reschedule"
+            name="action"
+            value="update"
           >
 
           <input
@@ -779,6 +779,18 @@
             type="hidden"
             id="rescheduleTimeSlot"
             name="timeSlot"
+          >
+
+          <input
+            type="hidden"
+            id="rescheduleCopies"
+            name="copies"
+          >
+
+          <input
+            type="hidden"
+            id="rescheduleNote"
+            name="note"
           >
         </form>
 
@@ -903,6 +915,7 @@
     let lastRequest = null;
     let latestRequestId = '';
     let activeRequests = [];
+    let pendingOperation = '';
     let currentReceiveMethod =
       RECEIVE_METHOD_DELIVERY;
 
@@ -1461,13 +1474,89 @@
 
 
 
+    function normalizeBackendRequest(request) {
+      const source = request || {};
+      const status =
+        String(source.status || '').trim() ||
+        '確認待ち';
+
+      const rawDate =
+        String(source.deliveryDate || '').trim();
+
+      const normalizedDate =
+        rawDate
+          .replace(///g, '-')
+          .replace(
+            /^(\d{4})-(\d{1,2})-(\d{1,2}).*$/,
+            function (_, y, m, d) {
+              return (
+                y + '-' +
+                String(m).padStart(2, '0') + '-' +
+                String(d).padStart(2, '0')
+              );
+            }
+          );
+
+      return Object.assign(
+        {},
+        source,
+        {
+          requestedAtText:
+            source.requestedAtText ||
+            source.receivedAt ||
+            '',
+
+          deliveryDate:
+            normalizedDate,
+
+          deliveryDateText:
+            source.deliveryDateText ||
+            rawDate.replace(/-/g, '/'),
+
+          updatedAtText:
+            source.updatedAtText ||
+            source.updatedAt ||
+            '',
+
+          staffMemo:
+            source.staffMemo ||
+            source.adminNote ||
+            '',
+
+          receiveMethod:
+            source.receiveMethod ||
+            RECEIVE_METHOD_DELIVERY,
+
+          statusLabel:
+            source.statusLabel ||
+            status,
+
+          canCancel:
+            typeof source.canCancel === 'boolean'
+              ? source.canCancel
+              : (
+                  status !== '配達完了' &&
+                  status !== 'キャンセル'
+                ),
+
+          canReschedule:
+            typeof source.canReschedule === 'boolean'
+              ? source.canReschedule
+              : status === '日時変更',
+
+          status: status
+        }
+      );
+    }
+
+
     function setActiveRequests(
       requests,
       responseHasRequestsField = true
     ) {
       activeRequests =
         Array.isArray(requests)
-          ? requests
+          ? requests.map(normalizeBackendRequest)
           : [];
 
       renderActiveRequests();
@@ -1569,6 +1658,7 @@
           }
         );
 
+      pendingOperation = 'cancel';
       cancelForm.submit();
 
       cancelTimer =
@@ -1707,6 +1797,7 @@
       statusMessage.textContent =
         '依頼状況を更新しています…';
 
+      pendingOperation = 'profile';
       profileForm.submit();
 
       window.clearTimeout(
@@ -1845,6 +1936,23 @@
       ).value =
         timeSlot;
 
+      if (!target) {
+        showError(
+          '変更対象の申込情報を取得できませんでした。依頼状況を更新してからもう一度お試しください。'
+        );
+        return;
+      }
+
+      document.getElementById(
+        'rescheduleCopies'
+      ).value =
+        Number(target.copies || 0);
+
+      document.getElementById(
+        'rescheduleNote'
+      ).value =
+        String(target.note || '');
+
       rescheduleForm.action =
         GAS_WEB_APP_URL;
 
@@ -1856,6 +1964,7 @@
           button.disabled = true;
         });
 
+      pendingOperation = 'reschedule';
       rescheduleForm.submit();
 
       rescheduleTimer =
@@ -1941,6 +2050,7 @@
 
         setupDateInput();
 
+        pendingOperation = 'profile';
         profileForm.submit();
 
         profileTimer =
@@ -2010,6 +2120,7 @@
 
         setSending(true);
 
+        pendingOperation = 'request';
         form.submit();
 
         responseTimer =
@@ -2041,7 +2152,23 @@
           return;
         }
 
-        if (result.mode === 'profile') {
+        const responseMode =
+          result.mode ||
+          (
+            result.action === 'list'
+              ? 'profile'
+              : result.action === 'cancel'
+                ? 'cancel'
+                : result.action === 'update'
+                  ? 'reschedule'
+                  : result.action === 'create'
+                    ? 'request'
+                    : pendingOperation
+          );
+
+        pendingOperation = '';
+
+        if (responseMode === 'profile') {
           window.clearTimeout(
             profileTimer
           );
@@ -2072,12 +2199,14 @@
 
           applyReceiveMethod();
 
+          const profileRequests =
+            Array.isArray(result.activeRequests)
+              ? result.activeRequests
+              : result.requests;
+
           setActiveRequests(
-            result.activeRequests,
-            Object.prototype.hasOwnProperty.call(
-              result,
-              'activeRequests'
-            )
+            profileRequests,
+            Array.isArray(profileRequests)
           );
 
           loadingView.hidden = true;
@@ -2086,7 +2215,7 @@
           return;
         }
 
-        if (result.mode === 'cancel') {
+        if (responseMode === 'cancel') {
           window.clearTimeout(
             cancelTimer
           );
@@ -2110,9 +2239,20 @@
             return;
           }
 
-          setActiveRequests(
-            result.activeRequests
-          );
+          if (
+            Array.isArray(result.activeRequests) ||
+            Array.isArray(result.requests)
+          ) {
+            setActiveRequests(
+              result.activeRequests ||
+              result.requests
+            );
+          } else {
+            window.setTimeout(
+              refreshRequestStatus,
+              300
+            );
+          }
 
           latestRequestId = '';
 
@@ -2132,7 +2272,7 @@
           return;
         }
 
-        if (result.mode === 'reschedule') {
+        if (responseMode === 'reschedule') {
           window.clearTimeout(
             rescheduleTimer
           );
@@ -2154,9 +2294,15 @@
             return;
           }
 
-          setActiveRequests(
-            result.activeRequests
-          );
+          if (
+            Array.isArray(result.activeRequests) ||
+            Array.isArray(result.requests)
+          ) {
+            setActiveRequests(
+              result.activeRequests ||
+              result.requests
+            );
+          }
 
           successView.hidden = true;
           formView.hidden = false;
@@ -2185,7 +2331,7 @@
           return;
         }
 
-        if (result.mode !== 'request') {
+        if (responseMode !== 'request') {
           return;
         }
 
@@ -2234,9 +2380,15 @@
         latestRequestId =
           result.requestId || '';
 
-        setActiveRequests(
-          result.activeRequests
-        );
+        if (
+          Array.isArray(result.activeRequests) ||
+          Array.isArray(result.requests)
+        ) {
+          setActiveRequests(
+            result.activeRequests ||
+            result.requests
+          );
+        }
 
         applyReceiveMethod();
 
@@ -2278,6 +2430,11 @@
 
         formView.hidden = true;
         successView.hidden = false;
+
+        window.setTimeout(
+          refreshRequestStatus,
+          500
+        );
 
         window.scrollTo({
           top: 0,
